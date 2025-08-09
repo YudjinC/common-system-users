@@ -1,5 +1,7 @@
 # common_system_users
 
+ [🇷🇺 Читать на русском](README.ru.md)
+
 Configuration and CI for deploying users (and removing them) via an Ansible playbook. Interaction mechanisms:
 
 ## Pipeline
