@@ -1,0 +1,65 @@
+- name: "Check if user exists of {{ user.name }}"
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ user.name }}"
+  register: user_exists
+  failed_when: false
+
+- name: "Create user {{ user.name }}"
+  ansible.builtin.user:
+    name: "{{ user.name }}"
+    comment: "{{ user.comment }}"
+    groups: "{{ user.groups | default('') }}"
+    state: "{{ user.presence_state | default('present') }}"
+    shell: "{{ user.shell | default('/bin/bash') }}"
+    password: "{{ user.password | default(omit) }}"
+  become: true
+  become_user: root
+  async: 10
+  poll: 0
+  register: user_create_async
+  when: (user_exists.ansible_facts is not defined)
+
+- name: "Add ssh public key for {{ user.name }}"
+  ansible.posix.authorized_key:
+    user: "{{ user.name }}"
+    key: "{{ ssh_key_item }}"
+    state: "{{ user.ssh_key_state }}"
+  become: true
+  become_user: root
+  async: 10
+  poll: 0
+  register: ssh_key_add_async
+  with_items: "{{ user.ssh_key }}"
+  loop_control:
+    loop_var: ssh_key_item
+  when: >
+    (user.presence_state is not defined or
+    user.presence_state != 'absent') and
+    user.ssh_key is defined and (user_exists.ansible_facts is not defined)
+
+- name: "Check status of creation for {{ user.name }}"
+  ansible.builtin.async_status:
+    jid: "{{ user_create_async.ansible_job_id }}"
+  register: user_create_status
+  until: user_create_status.finished
+  retries: 5
+  delay: 2
+  when: >
+    (user.presence_state is not defined or
+    user.presence_state != 'absent') and (user_exists.ansible_facts is not defined)
+
+- name: "Check status of SSH key addition for {{ user.name }}"
+  ansible.builtin.async_status:
+    jid: "{{ async_result.ansible_job_id }}"
+  register: ssh_key_status
+  until: ssh_key_status.finished
+  retries: 5
+  delay: 2
+  with_items: "{{ ssh_key_add_async.results }}"
+  loop_control:
+    loop_var: async_result
+    label: "{{ async_result.ssh_key_item }}"
+  when: >
+    (user.presence_state is not defined or
+    user.presence_state != 'absent') and (user_exists.ansible_facts is not defined)

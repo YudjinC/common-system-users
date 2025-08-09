@@ -1,0 +1,34 @@
+image: ujinb/ansible-crosspy:1.0.0
+
+variables:
+  ANSIBLE_FORCE_COLOR: "1"
+
+stages:
+  - lint
+  - deploy
+
+lint:
+  stage: lint
+  tags: [ansible-runner]
+  before_script:
+    - chmod 660 ../common_system_users
+  script:
+   - set -e
+   - ansible-lint playbooks/infra/system_users/main.yaml
+  rules:
+    - changes:
+        - playbooks/**/*
+        - roles/**/*
+    - when: never
+
+deploy:
+  stage: deploy
+  tags: [ansible-runner]
+  before_script:
+    - chmod 660 ../common_system_users
+    - export SSH_AUTH_SOCK=/tmp/nci-ssh-agent.sock
+  script:
+   - ansible-playbook -i inventories/infra/system_users/hosts.yaml playbooks/infra/system_users/main.yaml --limit "${LIMITS:-all}"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  when: manual

@@ -1,0 +1,59 @@
+- name: "Check if user exists for {{ user.name }}"
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ user.name }}"
+  register: user_exists
+  failed_when: false
+
+- name: "Remove SSH keys for users if ssh_key_state is absent for {{ user.name }}"
+  ansible.posix.authorized_key:
+    user: "{{ user.name }}"
+    key: "{{ user.ssh_key }}"
+    state: absent
+  become: true
+  become_user: root
+  async: 10
+  poll: 0
+  register: ssh_key_delete_async
+  when: >
+    (user.presence_state is defined and
+    user.presence_state == 'absent') and
+    user_exists.ansible_facts is defined
+
+- name: "Remove users from system if their presence_state is absent for {{ user.name }}"
+  ansible.builtin.user:
+    name: "{{ user.name }}"
+    state: absent
+  become: true
+  become_user: root
+  register: user_delete_async
+  async: 10
+  poll: 0
+  when: >
+    (user.presence_state is defined and
+    user.presence_state == 'absent') and
+    user_exists.ansible_facts is defined
+
+- name: "Check status of remove ssh key for {{ user.name }}"
+  ansible.builtin.async_status:
+    jid: "{{ ssh_key_delete_async.ansible_job_id }}"
+  register: ssh_key_delete_status
+  until: ssh_key_delete_status.finished
+  retries: 5
+  delay: 2
+  when: >
+    (user.presence_state is defined and
+    user.presence_state == 'absent') and
+    user_exists.ansible_facts is defined
+
+- name: "Check status of remove of {{ user.name }}"
+  ansible.builtin.async_status:
+    jid: "{{ user_delete_async.ansible_job_id }}"
+  register: user_delete_status
+  until: user_delete_status.finished
+  retries: 5
+  delay: 2
+  when: >
+    (user.presence_state is defined and
+    user.presence_state == 'absent') and
+    user_exists.ansible_facts is defined

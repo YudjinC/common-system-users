@@ -1,0 +1,122 @@
+---
+all:
+#########################################################################################
+  # proxy_hosts for other hosts (example)
+  hosts:
+    moscow_integration:
+      ansible_host: 181.147.52.195
+    belgorod_integration:
+      ansible_host: 235.84.233.135
+      ansible_port: 2201
+    kazan_integration:
+      ansible_host: 223.185.131.150
+    ekat_integration:
+      ansible_host: 7.103.172.53
+      ansible_port: 8423
+    novosib_integration:
+      ansible_host: 37.197.77.77
+#########################################################################################
+  vars:
+    lan_ip_address: "{{ ansible_host }}"
+    ansible_user: ansible
+    ansible_become_pass: passwd
+    ansible_python_interpreter: auto_silent
+    wheel_user: wheel
+    ansible_ssh_common_args: >
+      -o StrictHostKeyChecking=no -o HashKnownHosts=no -o ControlMaster=auto -o ControlPersist=30m
+      {%- if hostvars[inventory_hostname].proxy_host is defined %}
+        -o ProxyJump={{ hostvars[hostvars[inventory_hostname].proxy_host].ansible_user }}@{{ hostvars[hostvars[inventory_hostname].proxy_host].ansible_host }}:{{ hostvars[hostvars[inventory_hostname].proxy_host].ansible_port | default(22) }}
+      {%- endif %}
+
+    ansible_deploy_user:
+      - name: ansible
+        comment: "ansible deploy user"
+        shell: /bin/bash
+        groups: "{{ wheel_user }}"
+        ssh_key: 'ssh-rsa <>'
+        ssh_key_state: present
+    default_gp_ssh_users:
+      - name: "user1"
+        comment: "user name"
+        shell: /bin/bash
+        groups: "{{ wheel_user }}"
+        ssh_key: 'ssh-rsa '
+        ssh_key_state: present
+      - name: "user2"
+        comment: "user name"
+        shell: /bin/bash
+        groups: "{{ wheel_user }}"
+        ssh_key: 'ssh-rsa '
+        ssh_key_state: present
+    inf_ops_ssh_users:
+      - name: "user3"
+        comment: "user name"
+        shell: /bin/bash
+        groups: "{{ wheel_user }}"
+        password: "hash"
+        ssh_key: 'ssh-rsa '
+        ssh_key_state: present
+      - name: "user4"
+        comment: "user name"
+        shell: /bin/bash
+        groups: "{{ wheel_user }}"
+        password: "hash"
+        ssh_key: 'ssh-rsa '
+        ssh_key_state: present
+
+    absent_ssh_users:
+      - name: "user5"
+        comment: "user name"
+        groups: "{{ wheel_user }}"
+        ssh_key: 'ssh-rsa '
+        ssh_key_state: absent
+        presence_state: absent
+
+    default_ssh_users: "{{ default_gp_ssh_users + inf_ops_ssh_users }}"
+    default_with_ansible: "{{ ansible_deploy_user + default_gp_ssh_users + inf_ops_ssh_users }}"
+    ssh_users: "{{ default_ssh_users }}"
+    delete_users: "{{ absent_ssh_users  }}"
+#########################################################################################
+
+  children:
+
+  # examples
+
+    project1:
+      hosts:
+        project1_master1:
+          ansible_host: 139.244.245.220
+        project1_master2:
+          ansible_host: 139.244.245.221
+        project1_node1:
+          ansible_host: 139.244.245.222
+        project1_node2:
+          ansible_host: 139.244.245.223
+        project1_node3:
+          ansible_host: 139.244.245.224
+        project1_node4:
+          ansible_host: 139.244.245.225
+
+    project2:
+      vars:
+          ansible_host: 54.190.136.210
+      hosts:
+        bel_k8s_node1:
+          ansible_port: 2201
+        bel_k8s_node2:
+          ansible_port: 2202
+        bel_k8s_node3:
+          ansible_port: 2203
+        bel_k8s_node4:
+          ansible_port: 2204
+
+    project3:
+      vars:
+        proxy_host: moscow_integration
+      hosts:
+        bel_ap_master:
+          ansible_host: 190.142.49.126
+        bel_ap_node1:
+          ansible_host: 190.142.49.127
+        bel_ap_node2:
+          ansible_host: 190.142.49.128

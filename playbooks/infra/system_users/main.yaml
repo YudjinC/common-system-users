@@ -1,0 +1,9 @@
+- name: "Create and delete users"
+  hosts: all
+  gather_facts: true
+  gather_subset:
+    - "!all"
+    - "min"
+
+  roles:
+    - role: system_users
