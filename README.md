@@ -1,41 +1,60 @@
 # common_system_users
-Конфигурация и CI для деплоя юзеров (и их удаления) из ансиблового плейбука.
-Механизмы взаимодействия:
 
-1) Пайплайн (stage: lint через ansible-lint и deploy через ansible-playbook) создаётся после push-коммита из мастер-ветки (lint поождаётся из любой ветки).
-Такой механизм деплоя не лимитируется, выкатываются все инвентори.
+Configuration and CI for deploying users (and removing them) via an Ansible playbook. Interaction mechanisms:
 
-2) Для использования механизма лимитирования следует создать пайплайн из "Run pipeline" из веб-интерфейса гитлаба. При этом нужно задать переменную "LIMITS" и в значении перечислить необходимые лимиты.
+## Pipeline
 
-## Инвентори  
-hosts.yaml - файл инвентори, содержащий набор необходимых переменных и список всех хостов.
+A pipeline (`stage: lint` via `ansible-lint` and `stage: deploy` via `ansible-playbook`) is created after pushing a commit to the master branch (`lint` is triggered from any branch).  
+Such a deployment mechanism is not limited — all inventories are rolled out.
 
-### Списки юзеров  
-1) Юзеры, имеющие state present, представлены в списках ansible_deploy_user (сам ansible-user, которого нужно выкатывать руками, если ansible-user'а нет на хосте), default_gp_ssh_users, inf_ops_ssh_users.  
-2) Юзеры, имеющие state absent, представлены в отдельном списке absent_ssh_users.  
-Такое разделение имеет важное значение, т.к. по этим группам юзеров выполняются таски create и delete users.
+To use the limiting mechanism, you should create a pipeline from **"Run pipeline"** in the GitLab web interface.  
+In this case, you must set the `LIMITS` variable and specify the required limits in its value.
 
-### Список users для тасков create users  
-1) "По дефолту" используется список ssh_users, остоящий из всех групп юзеров, описанных в пред. пункте.  
-2) Кроме того, есть список default_with_ansible (те же юзеры + ansible-user, если требуется выкатить юзера ansible руками).  
-Эти группы можно указыть в vars для групп хостов, если эти необходимо.
+## Inventory
 
-### Принципы создания групп хостов  
-1) Основные переменные, которые могут потребоваться: ansible_host (ip для ssh-подключения к хосту), ansible_port (порт ssh-подключения), proxy_host (хост для proxy jump).  
-2) При создании инвентории главная цель была в минимизации дублирования хостов при описании, по этой причине инвентори организован так, что:  
-2.1.) На самом верхнем уровне vars (all) задаются хосты, которые являются проксирующими для остальных хостов (moscow_integration, belgorod_integration и т.д.).  
-2.2.) Если ansible_host, proxy_host или ansible_port нужен для нескольких хостов группы, то этот хост указывается в vars на уровне группы, например, как это сделано для project2:  
-```
-project2:
-    vars:
-        ansible_host: 54.190.136.210
-    hosts:
-    bel_k8s_node1:
-        ansible_port: 2201
-    bel_k8s_node2:
-        ansible_port: 2202
-    bel_k8s_node3:
-        ansible_port: 2203
-    bel_k8s_node4:
-        ansible_port: 2204
-```
+`hosts.yaml` — an inventory file containing the required variables and a list of all hosts.
+
+## User lists
+
+Users with `state: present` are represented in the following lists:
+
+- `ansible_deploy_user` — the ansible user itself (needs to be deployed manually if it is not present on the host)
+- `default_gp_ssh_users`
+- `inf_ops_ssh_users`
+
+Users with `state: absent` are listed separately in `absent_ssh_users`.  
+This separation is important because `create` and `delete` user tasks are performed on these respective groups.
+
+## The `users` list for the `create users` tasks
+
+By default, the `ssh_users` list is used, which contains all user groups described above.  
+In addition, there is a `default_with_ansible` list (the same users + the ansible user, if it needs to be deployed manually).
+
+These groups can be specified in `vars` for host groups if necessary.
+
+## Principles of creating host groups
+
+The main variables that may be needed:
+
+- `ansible_host` — IP address for SSH connection
+- `ansible_port` — SSH connection port
+- `proxy_host` — host for proxy jump
+
+When creating the inventory, the main goal was to minimize host duplication in definitions. For this reason, the inventory is organized as follows:
+
+1. At the top `vars` level (`all`), hosts that act as proxy hosts for other hosts are defined (e.g., `moscow_integration`, `belgorod_integration`, etc.).
+2. If `ansible_host`, `proxy_host`, or `ansible_port` is required for multiple hosts in a group, it is set in `vars` at the group level.  
+   Example for `project2`:
+   ```yaml
+   project2:
+     vars:
+       ansible_host: 54.190.136.210
+     hosts:
+       bel_k8s_node1:
+         ansible_port: 2201
+       bel_k8s_node2:
+         ansible_port: 2202
+       bel_k8s_node3:
+         ansible_port: 2203
+       bel_k8s_node4:
+         ansible_port: 2204
